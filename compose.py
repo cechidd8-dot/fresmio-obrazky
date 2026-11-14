@@ -38,6 +38,21 @@ def badge(canvas, text):
     bb = d.textbbox((0, 0), text, font=f)
     d.text((cx - (bb[2] - bb[0]) / 2 - bb[0], cy - (bb[3] - bb[1]) / 2 - bb[1]), text, font=f, fill="white")
 
+def watermark(canvas, text="FRESMIO EU"):
+    """jemný šikmý vodoznak opakovaný po celom obrázku"""
+    f = ImageFont.truetype(FONT, 54)
+    layer = Image.new("RGBA", (S * 2, S * 2), (0, 0, 0, 0))
+    d = ImageDraw.Draw(layer)
+    for y in range(0, S * 2, 230):
+        for x in range(-200 + (y // 230 % 2) * 250, S * 2, 500):
+            d.text((x, y), text, font=f, fill=(90, 90, 90, 38))
+    layer = layer.rotate(30, resample=Image.BICUBIC)
+    off = (S // 2, S // 2)
+    layer = layer.crop((off[0], off[1], off[0] + S, off[1] + S))
+    base = canvas.convert("RGBA")
+    base.alpha_composite(layer)
+    return base.convert("RGB")
+
 def make(prod, n):
     c = Image.new("RGB", (S, S), "white")
     if n == 1:
@@ -55,7 +70,7 @@ def make(prod, n):
                 paste_product(c, p, S / 2 + (i - 1) * 390, bottom)
     if n > 1:
         badge(c, f"{n} ks")
-    return c
+    return watermark(c)
 
 def main():
     items = json.load(open("products.json"))
