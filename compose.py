@@ -20,9 +20,9 @@ def trim(im):
     box = diff.getbbox()
     return im.crop(box) if box else im
 
-def fit(im, h):
-    w = int(im.width * h / im.height)
-    return im.resize((w, h), Image.LANCZOS)
+def fit(im, maxw, maxh):
+    r = min(maxw / im.width, maxh / im.height)
+    return im.resize((max(1, int(im.width * r)), max(1, int(im.height * r))), Image.LANCZOS)
 
 def paste_product(canvas, prod, cx, bottom):
     """vloží produkt so stredom cx a spodnou hranou bottom; biele pozadie sa neprekrýva"""
@@ -32,31 +32,27 @@ def paste_product(canvas, prod, cx, bottom):
 
 def badge(canvas, text):
     d = ImageDraw.Draw(canvas)
-    cx, cy, r = S - 170, 170, 125
+    cx, cy, r = S - 125, 115, 90
     d.ellipse((cx - r, cy - r, cx + r, cy + r), fill=(230, 57, 70))
-    f = ImageFont.truetype(FONT, 100)
+    f = ImageFont.truetype(FONT, 72)
     bb = d.textbbox((0, 0), text, font=f)
     d.text((cx - (bb[2] - bb[0]) / 2 - bb[0], cy - (bb[3] - bb[1]) / 2 - bb[1]), text, font=f, fill="white")
 
 def make(prod, n):
     c = Image.new("RGB", (S, S), "white")
     if n == 1:
-        p = fit(prod, 940); paste_product(c, p, S / 2, 1070)
+        paste_product(c, fit(prod, 960, 960), S / 2, 1080)
     elif n == 3:
-        h = 760
-        p = fit(prod, h)
-        step = min(int(p.width * 0.78), 360)
-        xs = [S / 2 - step, S / 2 + step, S / 2]
-        for cx in xs[:2]:
-            paste_product(c, fit(prod, int(h * 0.92)), cx, 1000)
-        paste_product(c, p, xs[2], 1080)
+        back = fit(prod, 500, 600)
+        front = fit(prod, 600, 680)
+        paste_product(c, back, S / 2 - 270, 940)
+        paste_product(c, back, S / 2 + 270, 940)
+        paste_product(c, front, S / 2, 1110)
     elif n == 6:
-        h = 470
-        p = fit(prod, h)
-        step = min(int(p.width * 1.05), 380)
-        for row, bottom in enumerate((600, 1110)):
+        p = fit(prod, 360, 430)
+        for bottom in (650, 1140):
             for i in range(3):
-                paste_product(c, p, S / 2 + (i - 1) * step, bottom)
+                paste_product(c, p, S / 2 + (i - 1) * 390, bottom)
     if n > 1:
         badge(c, f"{n} ks")
     return c
