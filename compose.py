@@ -14,11 +14,34 @@ def load(path):
     return im
 
 def trim(im):
-    bg = Image.new("RGB", im.size, (255, 255, 255))
+    """oreže biele okraje a odstráni malé oddelené pásy (napr. URL obchodu pod produktom)"""
     from PIL import ImageChops
+    bg = Image.new("RGB", im.size, (255, 255, 255))
     diff = ImageChops.difference(im, bg).convert("L").point(lambda p: 255 if p > 12 else 0)
     box = diff.getbbox()
-    return im.crop(box) if box else im
+    if not box:
+        return im
+    im = im.crop(box); diff = diff.crop(box)
+    W, H = im.size
+    rows = [diff.crop((0, y, W, y + 1)).getbbox() is not None for y in range(H)]
+    bands = []; y = 0
+    while y < H:
+        if rows[y]:
+            y0 = y
+            while y < H and rows[y]: y += 1
+            bands.append([y0, y])
+        else:
+            y += 1
+    # spoj pásy s malou medzerou (<2 % výšky), potom zahoď okrajový pás < 8 % výšky
+    merged = [bands[0]]
+    for b in bands[1:]:
+        if b[0] - merged[-1][1] < 3: merged[-1][1] = b[1]
+        else: merged.append(b)
+    while len(merged) > 1 and merged[-1][1] - merged[-1][0] < 0.06 * H: merged.pop()
+    while len(merged) > 1 and merged[0][1] - merged[0][0] < 0.06 * H: merged.pop(0)
+    im = im.crop((0, merged[0][0], W, merged[-1][1]))
+    d = diff.crop((0, merged[0][0], W, merged[-1][1])); b2 = d.getbbox()
+    return im.crop(b2) if b2 else im
 
 def fit(im, maxw, maxh):
     r = min(maxw / im.width, maxh / im.height)
