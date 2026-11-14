@@ -14,7 +14,8 @@ def load(path):
     return im
 
 def trim(im):
-    """oreže biele okraje a zmaže drobné oddelené prvky pri hornom/spodnom okraji (napr. URL obchodu pod produktom)"""
+    """oreže biele okraje; z hornej/dolnej strany odstráni text či URL, ktorý sa dotýka produktu
+    (erózia odstráni tenké písmená, ponechajú sa len veľké útvary = produkt)"""
     import numpy as np
     from scipy import ndimage as nd
     a = np.array(im.convert("RGB")).astype(int)
@@ -22,22 +23,21 @@ def trim(im):
     ys, xs = np.where(m)
     if len(ys) == 0:
         return im
-    y0, y1, x0, x1 = ys.min(), ys.max() + 1, xs.min(), xs.max() + 1
-    H = y1 - y0
-    lab, n = nd.label(m, structure=np.ones((3, 3)))
-    if n > 1:
-        sizes = nd.sum(m, lab, range(1, n + 1))
+    core = nd.binary_erosion(a.min(axis=2) < 225, structure=np.ones((3, 3)), iterations=2)
+    lab, n = nd.label(core, structure=np.ones((3, 3)))
+    if n:
+        sizes = nd.sum(core, lab, range(1, n + 1))
         big = sizes.max()
-        for i, sl in enumerate(nd.find_objects(lab)):
-            h = sl[0].stop - sl[0].start
-            near_edge = sl[0].start >= y1 - 0.12 * H or sl[0].stop <= y0 + 0.12 * H
-            if sizes[i] < 0.03 * big and h < 0.06 * H and near_edge:
-                a[sl][lab[sl] == i + 1] = 255
-        im = Image.fromarray(a.astype("uint8"))
-        m = (255 - a.min(axis=2)) > 12
+        boxes = [sl for i, sl in enumerate(nd.find_objects(lab)) if sizes[i] >= 0.03 * big]
+        ytop = min(sl[0].start for sl in boxes) - 2
+        ybot = max(sl[0].stop for sl in boxes) + 0
+        keep = np.zeros(m.shape, bool)
+        keep[max(ytop, 0):ybot, :] = True
+        m = m & keep
         ys, xs = np.where(m)
-        y0, y1, x0, x1 = ys.min(), ys.max() + 1, xs.min(), xs.max() + 1
-    return im.crop((x0, y0, x1, y1))
+        if len(ys) == 0:
+            return im
+    return im.crop((xs.min(), ys.min(), xs.max() + 1, ys.max() + 1))
 
 def fit(im, maxw, maxh):
     r = min(maxw / im.width, maxh / im.height)
