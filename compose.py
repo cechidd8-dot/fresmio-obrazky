@@ -7,6 +7,18 @@ FONT = "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf"
 S = 1200
 
 def load(path):
+    if path.startswith("http"):
+        r = requests.get(path, timeout=60, headers={"User-Agent": "Mozilla/5.0"})
+        r.raise_for_status()
+        im = Image.open(io.BytesIO(r.content))
+        if im.mode in ("RGBA", "LA", "P"):
+            im = im.convert("RGBA")
+            bg = Image.new("RGBA", im.size, "white")
+            bg.alpha_composite(im)
+            im = bg
+        im = im.convert("RGB")
+        im.thumbnail((900, 900), Image.LANCZOS)
+        return im
     u = f"{BASE}{path}?width=900&height=900&rmode=pad&format=png&bgcolor=white"
     r = requests.get(u, timeout=60, headers={"User-Agent": "Mozilla/5.0"})
     r.raise_for_status()
